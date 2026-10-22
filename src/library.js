@@ -62,7 +62,7 @@ export async function renderShelf(root, signal) {
         const registration = await navigator.serviceWorker?.getRegistration();
         await registration?.update();
         // 给新 SW 一点时间完成安装与接管，再刷新页面
-        await new Promise((resolve) => setTimeout(resolve, 800));
+        await new Promise((resolve) => setTimeout(resolve, 1500));
       } catch {
         /* 忽略 */
       }

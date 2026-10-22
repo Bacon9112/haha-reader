@@ -1,0 +1,13 @@
+{
+  "name": "haha-reader",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "哈哈阅读 —— 本地 TXT 电子书阅读器（MVP）",
+  "scripts": {
+    "start": "node tools/serve.mjs",
+    "test": "node --test --test-isolation=none \"tests/*.test.mjs\"",
+    "smoke": "node tests/smoke.mjs",
+    "e2e": "node tests/e2e.mjs"
+  }
+}

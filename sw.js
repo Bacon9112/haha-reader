@@ -5,8 +5,10 @@
  * 改动静态资源后请递增 VERSION，否则老客户端会继续用旧缓存。
  */
 
-const VERSION = 'v6';
+const VERSION = 'v7';
 const CACHE = `haha-reader-${VERSION}`;
+const SHARED_CACHE = 'haha-reader-shared';
+const SHARED_FILE_URL = new URL('./shared-file', self.location).href;
 
 const ASSETS = [
   './',
@@ -52,12 +54,44 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+/** 处理"分享到应用"的文件：先存进 Cache，再跳回应用，由页面负责导入。 */
+async function handleShare(request) {
+  try {
+    const formData = await request.formData();
+    const file = formData.get('file');
+    if (!file || typeof file === 'string') {
+      return Response.redirect('./?share=empty', 303);
+    }
+    const buffer = await file.arrayBuffer();
+    const cache = await caches.open(SHARED_CACHE);
+    await cache.put(
+      SHARED_FILE_URL,
+      new Response(buffer, {
+        headers: {
+          'content-type': file.type || 'application/octet-stream',
+          'x-filename': encodeURIComponent(file.name || 'shared-book.epub'),
+        },
+      }),
+    );
+    return Response.redirect('./?share=1', 303);
+  } catch (error) {
+    console.error('处理分享文件失败', error);
+    return Response.redirect('./?share=error', 303);
+  }
+}
+
 self.addEventListener('fetch', (event) => {
   const request = event.request;
-  if (request.method !== 'GET') return;
-
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+
+  // 分享目标：接收 POST 上传的文件
+  if (request.method === 'POST' && url.pathname.endsWith('/share-target')) {
+    event.respondWith(handleShare(request));
+    return;
+  }
+
+  if (request.method !== 'GET') return;
 
   // 页面导航一律回退到应用外壳（离线也能打开）
   if (request.mode === 'navigate') {

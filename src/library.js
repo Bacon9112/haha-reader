@@ -150,6 +150,25 @@ export async function renderShelf(root, signal) {
     await refresh();
   };
 
+  // 「分享到应用」：Service Worker 已把文件存进 Cache，这里读出来导入
+  const consumeSharedFile = async () => {
+    if (!('caches' in window)) return;
+    try {
+      const cache = await caches.open('haha-reader-shared');
+      const key = new URL('shared-file', location.href).href;
+      const response = await cache.match(key);
+      if (!response) return;
+
+      const name = decodeURIComponent(response.headers.get('x-filename') || '分享的书.epub');
+      const buffer = await response.arrayBuffer();
+      await cache.delete(key);
+      await importFiles([new File([buffer], name, { type: response.headers.get('content-type') || '' })]);
+    } catch (error) {
+      console.error('分享导入失败', error);
+      toast('分享导入失败，请重试');
+    }
+  };
+
   inputEl.addEventListener(
     'change',
     async () => {
@@ -214,6 +233,7 @@ export async function renderShelf(root, signal) {
   );
 
   await refresh();
+  await consumeSharedFile();
 }
 
 async function importTxt(file, buffer) {

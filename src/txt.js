@@ -80,7 +80,32 @@ export function detectParagraphStyle(lines) {
   if (nonEmpty === 0) return 'indent';
   if (indented / nonEmpty >= 0.15) return 'indent';
   if (internalBlanks >= 1) return 'block';
-  return 'line';
+
+  // 既没有缩进也没有空行：用句末标点区分「每行一段」和「硬换行的长文」
+  const sentenceEnded = all.filter(
+    (line) => line.trim() && /[。！？…”」』]$/u.test(line.trim()),
+  ).length;
+  return sentenceEnded / nonEmpty >= 0.7 ? 'line' : 'indent';
+}
+
+const SENTENCE_SPLIT_RE = /(?<=[。！？…])\s*/u;
+
+/** 超长段落按句号切成若干可读段落，避免出现几千字一大块。 */
+function splitLongParagraph(text, { max = 700, target = 220 } = {}) {
+  if (text.length <= max) return [text];
+
+  const parts = [];
+  let buffer = '';
+  for (const sentence of text.split(SENTENCE_SPLIT_RE)) {
+    if (!sentence) continue;
+    buffer += sentence;
+    if (buffer.length >= target) {
+      parts.push(buffer.trim());
+      buffer = '';
+    }
+  }
+  if (buffer.trim()) parts.push(buffer.trim());
+  return parts.filter(Boolean);
 }
 
 const ASCII_TAIL_RE = /[A-Za-z0-9]$/;
@@ -131,7 +156,9 @@ export function linesToParagraphs(lines, style = 'indent') {
   }
 
   flush();
-  return paragraphs;
+
+  // 保险：万一仍拼出超长段落，按句子切开
+  return paragraphs.flatMap((paragraph) => splitLongParagraph(paragraph));
 }
 
 /**
@@ -140,11 +167,12 @@ export function linesToParagraphs(lines, style = 'indent') {
  */
 export function splitChapters(text) {
   const lines = normalizeText(text).split('\n');
-  const style = detectParagraphStyle(lines);
   const chapters = [];
   let current = { title: '正文', lines: [] };
 
   const commit = () => {
+    // 逐章判断排版：一本书里不同章节的格式可能不一致
+    const style = detectParagraphStyle(current.lines);
     const paragraphs = linesToParagraphs(current.lines, style);
     if (paragraphs.length === 0) return;
     chapters.push({ title: current.title, paragraphs });

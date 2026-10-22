@@ -5,7 +5,7 @@
  * 改动静态资源后请递增 VERSION，否则老客户端会继续用旧缓存。
  */
 
-const VERSION = 'v9';
+const VERSION = 'v10';
 const CACHE = `haha-reader-${VERSION}`;
 const SHARED_CACHE = 'haha-reader-shared';
 const SHARED_FILE_URL = new URL('./shared-file', self.location).href;

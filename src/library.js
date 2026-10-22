@@ -16,9 +16,9 @@ export async function renderShelf(root, signal) {
           <h1>哈哈阅读</h1>
         </div>
         <label class="btn btn-primary" for="file-input">导入书籍</label>
-        <input id="file-input" type="file" accept=".txt,.epub,text/plain,application/epub+zip" multiple hidden />
+        <input id="file-input" type="file" class="visually-hidden" multiple />
       </header>
-      <p class="shelf-hint">支持 TXT 与 EPUB，可拖拽到页面。书籍只保存在本机浏览器，不会上传。</p>
+      <p class="shelf-hint">支持 TXT 与 EPUB，可拖拽到页面。手机上请先把书保存到「文件」再导入。</p>
       <ul class="book-list" id="book-list"></ul>
       <p class="shelf-empty" id="shelf-empty" hidden>书架还是空的，先导入一本 TXT 或 EPUB 吧。</p>
     </div>
@@ -49,9 +49,18 @@ export async function renderShelf(root, signal) {
   };
 
   const importFiles = async (fileList) => {
-    const files = [...fileList].filter((file) => /\.(txt|epub)$/i.test(file.name));
+    // 不限制 accept：手机上的 EPUB 常被标成 application/octet-stream，
+    // 用 MIME 过滤会让文件在选择器里变灰、选不中。这里只按扩展名判断。
+    const picked = [...fileList];
+    if (picked.length === 0) return;
+
+    const files = picked.filter((file) => /\.(txt|epub)$/i.test(file.name));
     if (files.length === 0) {
-      toast('只支持 .txt 和 .epub 文件');
+      const names = picked
+        .slice(0, 3)
+        .map((file) => `${file.name}（${file.type || '未知类型'}）`)
+        .join('、');
+      toast(`只支持 .txt / .epub，你选的是：${names}`);
       return;
     }
 
@@ -59,6 +68,10 @@ export async function renderShelf(root, signal) {
     let imported = 0;
 
     for (const file of files) {
+      if (file.size === 0) {
+        toast(`${file.name} 是空文件，跳过`);
+        continue;
+      }
       if (file.size > MAX_FILE_BYTES) {
         toast(`${file.name} 超过 40MB，先跳过`);
         continue;

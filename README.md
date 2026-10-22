@@ -15,7 +15,9 @@ node tools/serve.mjs
 
 也可以指定端口：`node tools/serve.mjs 8080`。
 
-导入方式：点「导入书籍」选择文件，或直接把 `.txt` / `.epub` 拖进页面。TXT 会自动识别 UTF-8（含 BOM）与 GB18030。
+想让同一 Wi-Fi 下的手机访问：`node tools/serve.mjs 5173 . 0.0.0.0`，启动后终端会打印局域网地址。注意局域网 http 不是安全上下文，Service Worker 不会注册，不能安装/离线；要装到手机请用 HTTPS 部署。
+
+导入方式：点「导入书籍」选择文件，或直接把 `.txt` / `.epub` 拖进页面。TXT 会自动识别 UTF-8（含 BOM）与 GB18030。**手机上**先用微信/网盘/数据线把书保存到系统「文件」或「下载」目录，再点导入；文件选择器不按 MIME 过滤，避免 Android 把 EPUB 标成 `application/octet-stream` 后无法选中。
 
 **安装成应用**：用 Chrome / Edge 打开后，地址栏右侧会出现安装图标（或菜单里的「应用 → 安装此站点」）。装好后可以独立窗口运行，断网也能继续读。
 

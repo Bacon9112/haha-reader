@@ -225,16 +225,27 @@ export async function openReader(root, bookId, signal) {
     tocItems.forEach((item, index) => item.classList.toggle('active', index === chapterIndex));
   };
 
-  const restoreScroll = () => {
+  // 切章时冻结滚动监听：替换内容会让高度骤变并触发 scroll，
+  // 若不冻结，ratio 会被改写成非零值，导致新章节没有回到顶部。
+  let restoring = false;
+
+  const applyScroll = (targetRatio) => {
     const max = scrollEl.scrollHeight - scrollEl.clientHeight;
-    scrollEl.scrollTop = ratio > 0 && max > 0 ? ratio * max : 0;
+    scrollEl.scrollTop = targetRatio > 0 && max > 0 ? targetRatio * max : 0;
+    ratio = targetRatio;
+    updateProgressUI();
   };
+
+  const restoreScroll = () => applyScroll(ratio);
 
   const renderChapter = (index, restoreRatio = 0, focus = null) => {
     chapterIndex = clamp(index, 0, chapterCount - 1);
     const chapter = chapters[chapterIndex];
     chapterNameEl.textContent = chapter.title;
-    ratio = clamp(restoreRatio, 0, 1);
+
+    const target = clamp(restoreRatio, 0, 1);
+    ratio = target;
+    restoring = true;
 
     disposeFrame?.();
     disposeFrame = null;
@@ -243,7 +254,8 @@ export async function openReader(root, bookId, signal) {
       const html = buildChapterHtml(epub, chapterIndex, { style: readerStyle(settings), urlFor });
       bodyEl.classList.add('chapter--epub');
       disposeFrame = mountChapterFrame(bodyEl, html, () => {
-        restoreScroll();
+        applyScroll(target);
+        restoring = false;
         if (focus) focusEpubMatch(focus);
       });
     } else {
@@ -252,7 +264,8 @@ export async function openReader(root, bookId, signal) {
         ? chapter.paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join('')
         : '<p class="chapter-empty">（本章没有正文）</p>';
       requestAnimationFrame(() => {
-        restoreScroll();
+        applyScroll(target);
+        restoring = false;
         if (focus) focusTextMatch(focus);
       });
     }
@@ -452,9 +465,12 @@ export async function openReader(root, bookId, signal) {
       renderChapter(chapterIndex, before);
       return;
     }
+    restoring = true;
     requestAnimationFrame(() => {
       const max = scrollEl.scrollHeight - scrollEl.clientHeight;
       scrollEl.scrollTop = before > 0 && max > 0 ? before * max : scrollEl.scrollTop;
+      ratio = before;
+      restoring = false;
       updateProgressUI();
     });
   };
@@ -463,6 +479,7 @@ export async function openReader(root, bookId, signal) {
   scrollEl.addEventListener(
     'scroll',
     () => {
+      if (restoring) return;
       const max = scrollEl.scrollHeight - scrollEl.clientHeight;
       ratio = max > 0 ? clamp(scrollEl.scrollTop / max, 0, 1) : 0;
       updateProgressUI();
@@ -479,7 +496,9 @@ export async function openReader(root, bookId, signal) {
     { signal },
   );
   window.addEventListener('pagehide', persist, { signal });
-  window.addEventListener('resize', restoreScroll, { signal });
+  window.addEventListener('resize', () => {
+    if (!restoring) restoreScroll();
+  }, { signal });
 
   // —— 点击 ——
   root.addEventListener(

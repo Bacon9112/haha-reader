@@ -3,6 +3,7 @@ import { percentOf, formatPercent, formatBytes, formatDate, escapeHtml, stripExt
 import { decodeText, splitChapters } from './txt.js';
 import { openEpub } from './epub.js';
 import { guessMediaType } from './epub-view.js';
+import { BUILD } from './version.js';
 import { toast } from './ui.js';
 
 const MAX_FILE_BYTES = 40 * 1024 * 1024;
@@ -15,12 +16,22 @@ export async function renderShelf(root, signal) {
           <span class="brand-mark">哈</span>
           <h1>哈哈阅读</h1>
         </div>
-        <label class="btn btn-primary" for="file-input">导入书籍</label>
-        <input id="file-input" type="file" class="visually-hidden" multiple />
+        <label class="btn btn-primary import-btn" for="file-input">
+          导入书籍
+          <input id="file-input" type="file" multiple />
+        </label>
       </header>
       <p class="shelf-hint">支持 TXT 与 EPUB，可拖拽到页面。手机上请先把书保存到「文件」再导入。</p>
       <ul class="book-list" id="book-list"></ul>
       <p class="shelf-empty" id="shelf-empty" hidden>书架还是空的，先导入一本 TXT 或 EPUB 吧。</p>
+      <p class="shelf-hint" id="standalone-hint" hidden>
+        安装版里如果点「导入书籍」没反应：请用 Chrome 打开同一网址导入，书会自动出现在这里（安卓共用存储）。
+      </p>
+      <p class="build-line">
+        <span>${BUILD} · ${escapeHtml(location.hostname)}</span>
+        <button class="link-btn" data-action="refresh-shelf">刷新</button>
+        <button class="link-btn" data-action="force-update">检查更新</button>
+      </p>
     </div>
   `;
 
@@ -28,12 +39,51 @@ export async function renderShelf(root, signal) {
   const emptyEl = root.querySelector('#shelf-empty');
   const inputEl = root.querySelector('#file-input');
 
+  // 安装版（standalone）里提示可以改用浏览器导入
+  const standalone = window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true;
+  if (standalone) {
+    const hint = root.querySelector('#standalone-hint');
+    if (hint) hint.hidden = false;
+  }
+
+  root.querySelector('[data-action="refresh-shelf"]')?.addEventListener(
+    'click',
+    async () => {
+      await refresh();
+      toast('书架已刷新');
+    },
+    { signal },
+  );
+
+  root.querySelector('[data-action="force-update"]')?.addEventListener(
+    'click',
+    async () => {
+      try {
+        const registration = await navigator.serviceWorker?.getRegistration();
+        await registration?.update();
+        // 给新 SW 一点时间完成安装与接管，再刷新页面
+        await new Promise((resolve) => setTimeout(resolve, 800));
+      } catch {
+        /* 忽略 */
+      }
+      location.reload();
+    },
+    { signal },
+  );
+
   let coverUrls = [];
   const revokeCovers = () => {
     coverUrls.forEach((url) => URL.revokeObjectURL(url));
     coverUrls = [];
   };
   signal?.addEventListener('abort', revokeCovers);
+
+  // 从浏览器切回应用时重新读一次书架，避免界面停留在旧数据
+  const refreshOnReturn = () => {
+    if (!document.hidden) refresh();
+  };
+  document.addEventListener('visibilitychange', refreshOnReturn, { signal });
+  window.addEventListener('focus', refreshOnReturn, { signal });
 
   const refresh = async () => {
     const [books, progressMap] = await Promise.all([listBooks(), getProgressMap()]);
@@ -105,6 +155,17 @@ export async function renderShelf(root, signal) {
     async () => {
       await importFiles(inputEl.files);
       inputEl.value = '';
+    },
+    { signal },
+  );
+
+  // 兜底：某些手机浏览器点 label 不会转发给 input，这里直接触发
+  root.querySelector('.import-btn')?.addEventListener(
+    'click',
+    (event) => {
+      if (event.target === inputEl) return;
+      event.preventDefault(); // 避免 label 默认转发造成二次打开
+      inputEl.click();
     },
     { signal },
   );

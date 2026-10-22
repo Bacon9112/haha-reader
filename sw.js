@@ -5,7 +5,7 @@
  * 改动静态资源后请递增 VERSION，否则老客户端会继续用旧缓存。
  */
 
-const VERSION = 'v3';
+const VERSION = 'v6';
 const CACHE = `haha-reader-${VERSION}`;
 
 const ASSETS = [
@@ -27,6 +27,7 @@ const ASSETS = [
   './src/settings.js',
   './src/txt.js',
   './src/ui.js',
+  './src/version.js',
   './src/xml.js',
   './src/zip.js',
 ];
